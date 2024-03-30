@@ -1,6 +1,6 @@
 ---
 title: "Gradient Descent"
-output: html_document
+Author: "Benjamin Huang"
 date: "2024-02-29"
 ---
 

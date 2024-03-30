@@ -1,8 +1,6 @@
 ---
 title: "Visualization"
-output:
-  pdf_document: default
-  html_document: default
+Author: "Benjamin Huang"
 date: "2024-02-08"
 ---
 
