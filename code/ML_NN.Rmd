@@ -24,6 +24,33 @@ Y <- X[, 1] + 10 * sin(X[, 2])^2 + 10 * X[, 3] + rnorm(n = 1000)
 # fix dims according to NN specs
 X <- t(X)
 Y <- t(Y)
+
+
+
+# Create line chart for each variable
+par(mfrow = c(1, 3))  # Set up plotting layout
+for (i in 1:3) {
+  plot(X[i, ], type = "l", main = paste("Line Chart for", rownames(X)[i]),
+       xlab = "Observation", ylab = "Value")
+}
+
+# Create histogram for each variable
+par(mfrow = c(1, 3))  # Reset plotting layout
+for (i in 1:3) {
+  hist(X[i, ], main = paste("Histogram for", rownames(X)[i]),
+       xlab = "Value", ylab = "Frequency", col = "skyblue", border = "black")
+}
+
+
+
+# Create histogram for Y variable
+hist(Y, main = "Histogram for Y", xlab = "Value", ylab = "Frequency", col = "skyblue", border = "black")
+
+# Select a subset of Y values to display on the dot chart
+subset_Y <- Y[seq(1, length(Y), by = 10)]  # Adjust the 'by' value as needed to control the density
+
+# Create dot chart for Y variable with subset of values
+dotchart(subset_Y, main = "Dot Chart for Y", xlab = "Value", ylab = "Observation")
 ```
 
 ```{r Link Function}
@@ -178,17 +205,21 @@ initialize_NN <- function(layer_sizes,
   b <- list()
   
   ## Initialize parameter matrices using mapply()
-  W <- mapply(function(rows, cols) 
-              matrix(runif(rows * cols, lower_bound, upper_bound), 
-              nrow = rows, 
-              ncol = cols),
-              n[-length(n)], n[-1])
+  for (l in 2:length(n)) {
   
-  b <- mapply(function(rows) 
-              matrix(runif(rows, lower_bound, upper_bound), 
-              nrow = rows, 
-              ncol = 1),
-              n[-1])
+    W[[l]] <- matrix(data = runif(n = n[l - 1] * n[l],
+                                  min = lower_bound,
+                                  max = upper_bound),
+                     nrow = n[l],
+                     ncol = n[l - 1])
+  
+    b[[l]] <- matrix(data = runif(n = n[l],
+                                  min = lower_bound,
+                                  max = upper_bound),
+                     nrow = n[l],
+                     ncol = 1)
+  
+  }
   
   ## return
   return(list(W = W,
@@ -230,7 +261,7 @@ NN_output <- function(X,
 }
 ```
 
-```{r}
+```{r Iteration}
 GD_iter <- function(NN_obj,
                     X,
                     Y,
@@ -328,4 +359,374 @@ GD_iter <- function(NN_obj,
               activation_function = NN_obj$activation_function,
               last_activation_function = NN_obj$last_activation_function))
 }
+```
+
+```{r Perform}
+GD_perform <- function(X,
+                       Y,
+                       init_NN_obj,
+                       rho = 0.01,
+                       loss_function = "squared_error",
+                       threshold = 1,
+                       max_iter = 100,
+                       print_descent = FALSE) {
+  
+  ## setup
+  done_decreasing <- FALSE
+  
+  objective_function <- get_loss_function(type = loss_function)
+  
+  iteration_outputs <- list()
+  output_objectives <- numeric()
+  
+  iteration_input <- init_NN_obj
+  
+  iter <- 1
+  
+  initial_objective <- objective_function(y = Y,
+                                          y_hat = NN_output(X = X,
+                                                            NN_obj = init_NN_obj))
+  
+  if (print_descent == TRUE) {
+    print(paste0("iter: ", 0, "; obj: ", round(initial_objective, 1)))
+  }
+  
+  while ((!done_decreasing) & (iter < max_iter)) {
+    
+    ## get input loss
+    in_objective <- objective_function(y = Y,
+                                       y_hat = NN_output(X = X,
+                                                         NN_obj = iteration_input))
+    
+    ## iterate
+    iteration_output <- GD_iter(NN_obj = iteration_input,
+                                X = X,
+                                Y = Y,
+                                rho = rho,
+                                verbose = FALSE,
+                                very_verbose = FALSE)
+
+    ## outputs
+    out_objective <- objective_function(y = Y,
+                                        y_hat = NN_output(X = X,
+                                                          NN_obj = iteration_output))
+    
+    iteration_input <- iteration_output
+    iteration_outputs[[iter]] <- iteration_output
+    output_objectives[[iter]] <- out_objective
+    
+    if (print_descent == TRUE) {
+      print(paste0("iter: ", iter, "; obj: ", round(out_objective, 1)))
+    }
+    
+    iter <- iter + 1
+    
+    ## evaluate
+    if (abs(in_objective - out_objective) < threshold) {
+      done_decreasing <- TRUE
+    }
+    
+  }
+  
+  return(list(final_NN = iteration_output,
+              intermediate_NN = iteration_outputs,
+              output_objectives = output_objectives,
+              initial_objective = initial_objective,
+              params = list(rho = rho,
+                            loss_function = loss_function,
+                            initial_NN = init_NN_obj)))
+}
+```
+
+```{r Summary}
+GD_plot <- function(GD_obj) {
+  
+    data.frame(x = 1:length(GD_obj$output_objectives),
+               y = GD_obj$output_objectives) %>%
+    ggplot(aes(x = x,
+               y = y)) +
+    geom_point() +
+    theme_bw() +
+    labs(x = "Iteration",
+         y = "Loss")
+    
+}
+
+GD_summary <- function(GD_obj,
+                       print_summary = TRUE) {
+  
+  ## num iter
+  num_iter <- length(GD_obj$output_objectives)
+  
+  ## loss improvement
+  initial_objective <- GD_obj$initial_objective %>% round(1)
+  final_objective <- last(GD_obj$output_objectives) %>% round(1)
+  loss_improvement_ratio <- (final_objective / initial_objective)  %>% round(4)
+  
+  if (print_summary == TRUE) {
+  
+    ## prints
+    cat(paste0("Gradient Descent Summary:", "\n",
+               "  |", "\n",
+               "  |  Number of Iterations: ", num_iter, "\n",
+               "  |", "\n",
+               "  |  Initial Objective: ", initial_objective, "\n",
+               "  |  Final Objective: ", final_objective, "\n",
+               "  |  Ratio: ", loss_improvement_ratio, "\n", "\n"))
+    
+    cat(paste0("----------------------------------------", "\n",
+               "Initial W:", "\n", "\n"))
+    print(GD_obj$params$initial_NN$W[-1])
+    cat(paste0("----------------------------------------", "\n",
+               "Final W:", "\n", "\n"))
+    print(GD_obj$final_NN$W[-1])
+    
+    cat(paste0("----------------------------------------", "\n",
+               "Initial b:", "\n", "\n"))
+    print(GD_obj$params$initial_NN$b[-1])
+    cat(paste0("----------------------------------------", "\n",
+               "Final b:", "\n", "\n"))
+    print(GD_obj$final_NN$b[-1])
+    
+  }
+  
+  return(list(num_iter = num_iter,
+              initial_objective = initial_objective,
+              final_objective = final_objective,
+              loss_improvement_ratio = loss_improvement_ratio))
+}
+```
+
+```{r test}
+## initialize NN
+init_NN <- initialize_NN(layer_sizes = c(3, 3, 1),
+                         activation_function = "relu",
+                         last_activation_function = "identity",
+                         lower_bound = 0,
+                         upper_bound = 1)
+
+## train NN
+GD_NN <- GD_perform(X = X,
+                    Y = Y,
+                    init_NN_obj = init_NN,
+                    rho = 0.001,
+                    loss_function = "squared_error",
+                    threshold = 100,
+                    max_iter = 1000,
+                    print_descent = FALSE)
+
+final_NN <- GD_NN$final_NN
+
+## Summaries
+NN_sum <- GD_summary(GD_obj = GD_NN)
+
+GD_plot(GD_NN)
+```
+
+```{r Cross-validation}
+library(ggplot2)
+
+# Function to compute accuracy
+compute_accuracy <- function(y_true, y_pred, sample_size = 100) {
+  
+  sample_indices <- sample(1:ncol(y_true), sample_size, replace = FALSE)  # Select a random sample of indices
+  
+  
+  y_true_class <- apply(y_true[, sample_indices, drop = FALSE], 1, function(x) which.max(x))  # Get the index of the true class for the sample
+  y_pred_class <- apply(y_pred[, sample_indices, drop = FALSE], 1, function(x) which.max(x))  # Get the index of the predicted class for the sample
+  
+  
+  diff_indices <- abs(y_true_class - y_pred_class)  # Compute the difference of indices
+  accurate_indices <- diff_indices <= 10  # Indices with a difference <= 7
+  accurate <- sum(accurate_indices)  # Count accurate predictions
+  inaccurate <- sum(!accurate_indices)  # Count inaccurate predictions
+  accuracy <- accurate / (accurate + inaccurate)  # Compute accuracy
+  return(accuracy)
+}
+
+
+# Number of folds for cross-validation
+k <- 5
+max_iter <- 100  # Set the maximum number of iterations for gradient descent
+
+# Initialize vectors to store training and validation losses
+train_losses <- matrix(NA, nrow = max_iter, ncol = k)
+valid_losses <- matrix(NA, nrow = max_iter, ncol = k)
+train_accuracies <- numeric(max_iter)
+valid_accuracies <- numeric(max_iter)
+
+# Perform 5-fold cross-validation
+for (fold in 1:k) {
+  
+  ## Define fold indices for X and Y separately
+  fold_indices_X <- ((fold - 1) * ncol(X) / k + 1):(fold * ncol(X) / k)
+  fold_indices_Y <- ((fold - 1) * ncol(Y) / k + 1):(fold * ncol(Y) / k)
+
+  ## Splitting the data into train and validation sets for X and Y
+  X_valid_fold <- X[, fold_indices_X]
+  Y_valid_fold <- Y[, fold_indices_Y, drop = FALSE]
+  X_train_fold <- X[, -fold_indices_X]
+  Y_train_fold <- Y[, -fold_indices_Y, drop = FALSE]
+  
+  # Perform gradient descent on the training set for this fold
+  GD_NN <- GD_perform(X = X_train_fold,
+                      Y = Y_train_fold,
+                      init_NN_obj = init_NN,
+                      rho = 0.001,
+                      loss_function = "squared_error",
+                      threshold = 100,
+                      max_iter = 1000,
+                      print_descent = FALSE)
+  
+  # Evaluate the model on the validation set for this fold
+  objective_fuction <- function(y, y_hat) {
+    return(get_loss_function(type = "squared_error")(y_hat, y))
+    }
+  for (epoch in 1:max_iter) {
+    train_loss <- objective_function(y = Y_train_fold,
+                                     y_hat = NN_output(X = X_train_fold,
+                                                       NN_obj = GD_NN$intermediate_NN[[epoch]]))
+    valid_loss <- objective_function(y = Y_valid_fold,
+                                     y_hat = NN_output(X = X_valid_fold,
+                                                       NN_obj = GD_NN$intermediate_NN[[epoch]]))
+    train_losses[epoch, fold] <- train_loss
+    valid_losses[epoch, fold] <- valid_loss
+    
+    # Compute accuracy
+    train_accuracy <- compute_accuracy(Y_train_fold, NN_output(X = X_train_fold,
+                                                               NN_obj = GD_NN$intermediate_NN[[epoch]]))
+    valid_accuracy <- compute_accuracy(Y_valid_fold, NN_output(X = X_valid_fold,
+                                                               NN_obj = GD_NN$intermediate_NN[[epoch]]))
+    train_accuracies[epoch] <- train_accuracy
+    valid_accuracies[epoch] <- valid_accuracy
+  }
+}
+
+# Plot training and validation losses
+epoch <- 1:max_iter
+train_loss_mean <- apply(train_losses, 1, mean)
+valid_loss_mean <- apply(valid_losses, 1, mean)
+
+train_accuracy_mean <- mean(train_accuracies)
+valid_accuracy_mean <- mean(valid_accuracies)
+
+df_loss <- data.frame(epoch = epoch,
+                      train_loss = train_loss_mean,
+                      valid_loss = valid_loss_mean)
+
+ggplot(data = df_loss, aes(x = epoch)) +
+  geom_line(aes(y = train_loss, color = "Train Loss")) +
+  geom_line(aes(y = valid_loss, color = "Validation Loss")) +
+  scale_color_manual(values = c("Train Loss" = "blue", "Validation Loss" = "red")) +
+  labs(x = "Epoch", y = "Loss", color = "Loss Type") +
+  ggtitle("Training and Validation Losses") +
+  theme_minimal()
+
+# Plot training and validation accuracies
+df_accuracy <- data.frame(epoch = epoch,
+                          train_accuracy = train_accuracies,
+                          valid_accuracy = valid_accuracies)
+
+ggplot(data = df_accuracy, aes(x = epoch)) +
+  geom_line(aes(y = train_accuracy, color = "Train Accuracy")) +
+  geom_line(aes(y = valid_accuracy, color = "Validation Accuracy")) +
+  scale_color_manual(values = c("Train Accuracy" = "blue", "Validation Accuracy" = "red")) +
+  labs(x = "Epoch", y = "Accuracy", color = "Accuracy Type") +
+  ggtitle("Training and Validation Accuracies") +
+  theme_minimal()
+
+```
+
+```{r }
+library(plotly)
+
+# Generate a grid of points for X1 and X2
+x1 <- seq(min(X[, 1]), max(X[, 1]), length.out = 100)
+x2 <- seq(min(X[, 2]), max(X[, 2]), length.out = 100)
+x3 <- seq(min(X[, 3]), max(X[, 3]), length.out = 100)
+X_grid <- expand.grid(X1 = x1, X2 = x2, X3 = x3)
+
+# Compute the corresponding Y values for the grid points
+Y_grid <- X_grid[, 1] + 10 * sin(X_grid[, 2])^2 + 10 * X_grid[, 3] # Adjust as needed
+
+# Reshape Y_grid to match the dimensions of the grid
+z <- matrix(Y_grid, nrow = length(x1), ncol = length(x2))
+
+# Create 3D surface plot with color representing the fourth dimension (Y)
+plot_ly(z = ~z, x = ~x1, y = ~x2, type = "surface", colorscale = "Viridis")
+```
+
+```{r }
+## initialize NN
+init_NN <- initialize_NN(layer_sizes = c(3, 3, 1),
+                         activation_function = "relu",
+                         last_activation_function = "identity",
+                         lower_bound = 0,
+                         upper_bound = 1)
+
+# Store the parameters (weights and biases) and loss values during each iteration
+parameter_trace <- list()
+loss_trace <- numeric()
+max_iter <- 100
+
+for (epoch in 1:max_iter) {
+  # Perform gradient descent
+  GD_NN <- GD_perform(X = X,
+                      Y = Y,
+                      init_NN_obj = init_NN,
+                      rho = 0.001,
+                      loss_function = "squared_error",
+                      threshold = 100,
+                      max_iter = max_iter,
+                      print_descent = FALSE)
+  # Update the parameters using gradient descent
+  GD_NN1 <- GD_iter(NN_obj = GD_NN$final_NN,
+                    X = X,
+                    Y = Y,
+                    rho = 0.001,
+                    verbose = FALSE,
+                    very_verbose = FALSE)
+  
+  # Store the parameters at this iteration
+  parameter_trace[[epoch]] <- list(W = GD_NN1$W, b = GD_NN1$b)
+  
+  # Compute loss for this epoch
+  loss <- objective_function(y = Y, 
+                             y_hat = NN_output(X = X, 
+                                               NN_obj = GD_NN$final_NN))
+  loss_trace <- c(loss_trace, loss)
+}
+
+# Extract weights and biases from the parameter trace
+weights <- sapply(parameter_trace, function(p) unlist(p$W))
+biases <- sapply(parameter_trace, function(p) unlist(p$b))
+
+# Plot the 3D plot
+plot_ly(x = weights[1, ], y = biases[1, ], z = loss_trace, type = "scatter3d", mode = "markers", marker = list(size = 5)) %>%
+  add_trace(x = weights[2, ], y = biases[2, ], z = loss_trace, mode = "markers", marker = list(size = 5)) %>%
+  add_trace(x = weights[3, ], y = biases[3, ], z = loss_trace, mode = "markers", marker = list(size = 5)) %>%
+  layout(scene = list(xaxis = list(title = "Weights"),
+                      yaxis = list(title = "Biases"),
+                      zaxis = list(title = "Loss"),
+                      title = "Trace of Gradient Descent in 3D Space"))
+
+```
+
+```{r }
+# Plot the 3D plot
+plot <- plot_ly()  # Initialize plot object
+
+# Add traces for each epoch
+for (i in 1:max_iter) {
+  plot <- plot %>% add_trace(x = weights[i, ], y = biases[i, ], z = loss_trace[i], mode = "markers", name = paste("Epoch", i))
+}
+
+# Layout settings
+plot <- plot %>% layout(scene = list(xaxis = list(title = "Weights"),
+                                     yaxis = list(title = "Biases"),
+                                     zaxis = list(title = "Loss"),
+                                     title = "Trace of Gradient Descent in 3D Space"))
+
+# Display the plot
+plot
 ```
