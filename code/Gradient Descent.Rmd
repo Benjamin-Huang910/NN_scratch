@@ -139,6 +139,7 @@ model1 %>% fit(train_images, train_labels, epochs = 10, batch_size = 64, validat
 test_loss_and_accuracy <- model1 %>% evaluate(test_images, test_labels)
 cat("Test loss and accuracy:", test_loss_and_accuracy, "\n")
 ```
+
 ```{r trace}
 library(plotly)
 
@@ -214,9 +215,9 @@ for (e in 1:epochs) {
 
   # Add points to the 3D plot
   plot <- plot %>% add_trace(x = error_x, y = error_y, z = current_z, type = "scatter3d", mode = "markers", marker = list(size = 5))
-
+            
   # Update weights
-  if (current_m_x != 0 || current_m_y != 0) {
+  if (error_x != 0 || error_y != 0) {
     w_x <- w_x + (error_x * lr) * train_x
     w_y <- w_y + (error_y * lr) * train_y
   } else {
@@ -224,8 +225,13 @@ for (e in 1:epochs) {
   }
 }
 
+# Define the layout with legend position
+plot <- plot %>% layout(scene = list(aspectmode = "cube"),
+                        legend = list(x = 0.8, y = 0.8))  # Adjust the x and y values as needed
+
 # Display the final 3D plot
 plot
+
 ```
 
 ```{r curved surface}
@@ -291,7 +297,7 @@ x_1 <- seq(-20, 20, length.out = 500)
 y_1 <- seq(-20, 20, length.out = 500)
 z_1 <- outer(x_1, y_1, curved_surface)
 
-
+p <- plot_ly(z = z_1, x = x_1, y = y_1, type = "surface")
 
 
 # Set hyperparameters
@@ -316,8 +322,6 @@ plot <- plot_ly(
 ) %>%
   layout(scene = list(aspectmode = "cube"))
 
-p <- plot_ly(z = z_1, x = x_1, y = y_1, type = "surface")
-
 # Training loop
 for (e in 1:epochs) {
   # Predict
@@ -338,13 +342,17 @@ for (e in 1:epochs) {
   plot <- plot %>% add_trace(x = error_x, y = error_y, z = current_z, type = "scatter3d", mode = "markers", marker = list(size = 5))
 
   # Update weights
-  if (current_m_x != 0 || current_m_y != 0) {
+  if (error_x != 0 || error_y != 0) {
     w_x <- w_x + (error_x * lr) * train_x
     w_y <- w_y + (error_y * lr) * train_y
   } else {
     cat("Error is minimum.\n")
   }
 }
+
+# Define the layout with legend position
+plot <- plot %>% layout(scene = list(aspectmode = "cube"),
+                        legend = list(x = 0.8, y = 0.8))  # Adjust the x and y values as needed
 
 # Combine the two plots into one
 combined_plot <- subplot(

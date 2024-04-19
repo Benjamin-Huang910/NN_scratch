@@ -579,7 +579,7 @@ for (fold in 1:k) {
                       print_descent = FALSE)
   
   # Evaluate the model on the validation set for this fold
-  objective_fuction <- function(y, y_hat) {
+  objective_function <- function(y, y_hat) {
     return(get_loss_function(type = "squared_error")(y_hat, y))
     }
   for (epoch in 1:max_iter) {

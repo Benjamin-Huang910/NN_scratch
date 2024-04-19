@@ -1,0 +1,71 @@
+---
+title: "Misc. Materials"
+author: "Benjamin Huang"
+date: "2024-04-12"
+output: html_document
+---
+
+```{r sigmoid}
+# Define the sigmoid function
+sigmoid <- function(z) {
+  return(1 / (1 + exp(-z)))
+}
+
+# Generate values for z
+z_values <- seq(-10, 10, length.out = 100)
+
+# Calculate corresponding values of sigmoid function
+g_values <- sigmoid(z_values)
+
+# Plot the sigmoid function
+plot(z_values, g_values, type = "l", col = "blue", 
+     xlab = "z", ylab = "g(z)", 
+     main = "Graph of Sigmoid Function", 
+     xlim = c(-10, 10), ylim = c(0, 1), 
+     grid = TRUE)
+legend("bottomright", legend = "Sigmoid Function", col = "blue", lty = 1)
+```
+
+```{r relu}
+# Define the ReLU function
+relu <- function(z) {
+  ifelse(z < 0, 0, z)
+}
+
+# Generate values for z
+z_values <- seq(-10, 10, by = 0.1)
+
+# Compute corresponding values for g(z)
+g_values <- relu(z_values)
+
+# Plot the ReLU function
+plot(z_values, g_values, type = "l", col = "red",
+     xlab = "z", ylab = "g(z)",
+     main = "Graph of ReLU Function",
+     xlim = c(-10, 10), ylim = c(0, 1),
+     grid = TRUE)
+legend("bottomright", legend = "ReLu Function", col = "red", lty = 1)
+```
+
+```{r softmax}
+# Define the softmax function
+softmax <- function(z) {
+  exp_z <- exp(z)
+  softmax <- exp_z / sum(exp_z)
+  return(softmax)
+}
+
+# Generate some sample z values
+z_values <- seq(-10, 10, by = 1.5)
+
+# Compute softmax function values
+softmax_values <- softmax(z_values)
+
+# Plot the softmax function
+plot(z_values, softmax_values, type = "l", col = "orange",
+     xlab = "z", ylab = "f_s(X)",
+     main = "Graph of Softmax Function",
+     xlim = c(-10, 10), ylim = c(0, 1),
+     grid = TRUE)
+legend("topright", legend = "Softmax Function", col = "orange", lty = 1)
+```
