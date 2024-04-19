@@ -1,0 +1,732 @@
+---
+title: "Multi-Layer NN Notes"
+author: "Daniel Polites"
+output: pdf_document
+---
+
+```{=tex}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathcal{C}}
+\newcommand{\err}{\hat \epsilon_i}
+\newcommand{\errvec}{\mathbf{\hat \epsilon}}
+\newcommand{\diag}{\text{diag}}
+```
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+set.seed(1000)
+```
+
+# Notation Setup
+
+source: <https://arxiv.org/abs/1801.05894>
+
+------------------------------------------------------------------------
+
+## Scalars
+
+Layers: 1-$L$, indexed by $l$
+
+Number of Neurons in layer $l$: $n_l$
+
+Neuron Activations: $a^{(\text{layer num})}_{\text{neuron num}} = a^{(l)}_j$. Vector of activations for a layer is $a^{(l)}$
+
+Activation Function: $g(\cdot)$ is our generic activation function
+
+------------------------------------------------------------------------
+
+## X
+
+We have our input matrix $X \in \R^{\text{vars} \times \text{obs}} = \R^{n_0 \times m}$:
+
+$$
+X = \ ^{n_0 \text{ inputs}}
+\overbrace{
+  \begin{cases}
+    \begin{bmatrix}
+    x_{1, 1} & x_{1, 2} & \cdots & x_{1, m} \\
+    x_{2, 1} & x_{2, 2} & \cdots & x_{2, m} \\
+    \vdots & \vdots & \ddots & \vdots \\
+    x_{n_0, 1} & x_{n_0, 2} & \cdots & x_{n_0, m} \\
+    \end{bmatrix}
+  \end{cases} 
+}^{m \text{ obs}}
+$$
+
+The $i$th observation of $X$ is the $i$th column of $X$, referenced as $x_i$.
+
+------------------------------------------------------------------------
+
+## W
+
+our Weight matrices $W^{(l)} \in \R^{\text{out} \times \text{in}} = \R^{n_l \times n_{l - 1}}$:
+
+$$
+W^{(l)} = \ ^{n_l\text{ outputs}}
+\overbrace{
+  \begin{cases}
+    \begin{bmatrix}
+    w^{(l)}_{1, 1} & w^{(l)}_{1, 2} & \cdots & w^{(l)}_{1, n_{l-1}} \\
+    w^{(l)}_{2, 1} & w^{(l)}_{2, 2} & \cdots & w^{(l)}_{2, n_{l-1}} \\
+    \vdots & \vdots & \ddots & \vdots \\
+    w^{(l)}_{n_l, 1} & w^{(l)}_{n_l, 2} & \cdots & w^{(l)}_{n_l, n_{l-1}}
+    \end{bmatrix}
+  \end{cases} 
+}^{n_{l - 1} \text{ inputs}}
+$$
+
+$W^{(l)}$ is the weight matrix for the $l$th layer
+
+------------------------------------------------------------------------
+
+## b
+
+our Bias matrices $b^{(l)} \in \R^{\text{out} \times 1} = \R^{n_l \times 1}$:
+
+$$
+b^{(l)} = \ ^{n_l\text{ outputs}}
+  \begin{cases}
+    \begin{bmatrix}
+    b^{(l)}_{1} \\
+    b^{(l)}_{2} \\
+    \vdots \\
+    b^{(l)}_{n_l}
+    \end{bmatrix}
+  \end{cases}
+$$
+
+$b^{(l)}$ is the bias matrix for the $l$th layer
+
+------------------------------------------------------------------------
+
+## Y
+
+our target layer matrix $Y \in \R^{\text{cats} \times \text{obs}} = \R^{n_L \times m}$:
+
+$$
+Y = \ ^{n_L \text{ categories}}
+\overbrace{
+  \begin{cases}
+    \begin{bmatrix}
+    y_{1, 1} & y_{1, 2} & \cdots & y_{1, m} \\
+    y_{2, 1} & y_{2, 2} & \cdots & y_{2, m} \\
+    \vdots & \vdots & \ddots & \vdots \\
+    y_{n_L, 1} & y_{n_L, 2} & \cdots & y_{n_L, m}
+    \end{bmatrix}
+  \end{cases} 
+}^{m \text{ obs}}
+$$
+
+Similar to $X$, the $i$th observation of $Y$ is the $i$th column of $Y$, referenced as $y_i$.
+
+------------------------------------------------------------------------
+
+## z
+
+our neuron layer's activation function input $z^{(l)} \in \R^{\text{out} \times 1} = \R^{n_l \times 1}$:
+
+$$
+z^{(l)} = \ ^{n_l\text{ outputs}}
+  \begin{cases}
+    \begin{bmatrix}
+      z^{(l)}_{1} \\
+      z^{(l)}_{2} \\
+      \vdots \\
+      z^{(l)}_{n_l}
+    \end{bmatrix}
+  \end{cases}
+$$
+
+$z^{(l)}$ is the neuron 'weighted input' matrix for the $l$th layer
+
+We have that:
+
+$$
+\begin{aligned}
+z^{(l)} &= W^{(l)} * a^{(l - 1)} + b^{(l)} \\ \\
+&= \ ^{n_l\text{ outputs}}
+\overbrace{
+  \begin{cases}
+    \begin{bmatrix}
+    w^{(l)}_{1, 1} & w^{(l)}_{1, 2} & \cdots & w^{(l)}_{1, n_{l-1}} \\
+    w^{(l)}_{2, 1} & w^{(l)}_{2, 2} & \cdots & w^{(l)}_{2, n_{l-1}} \\
+    \vdots & \vdots & \ddots & \vdots \\
+    w^{(l)}_{n_l, 1} & w^{(l)}_{n_l, 2} & \cdots & w^{(l)}_{n_l, n_{l-1}}
+    \end{bmatrix}
+  \end{cases} 
+}^{n_{l - 1} \text{ inputs}} * \ ^{n_{l - 1} \text{ inputs}}
+  \begin{cases}
+    \begin{bmatrix}
+      a^{(l-1)}_{1} \\
+      a^{(l-1)}_{2} \\
+      \vdots \\
+      a^{(l-1)}_{n_l}
+    \end{bmatrix}
+  \end{cases} + \ ^{n_l\text{ outputs}}
+  \begin{cases}
+    \begin{bmatrix}
+    b^{(l)}_{1} \\
+    b^{(l)}_{2} \\
+    \vdots \\
+    b^{(l)}_{n_l}
+    \end{bmatrix}
+  \end{cases} \\ \\
+&= \ ^{n_l\text{ outputs}}
+  \begin{cases}
+    \begin{bmatrix}
+      z^{(l)}_{1} \\
+      z^{(l)}_{2} \\
+      \vdots \\
+      z^{(l)}_{n_l}
+    \end{bmatrix}
+  \end{cases}
+\end{aligned}
+$$
+
+------------------------------------------------------------------------
+
+## a
+
+our Neuron Activation $a^{(l)} \in \R^{\text{out} \times 1} = \R^{n_l \times 1}$:
+
+$$
+a^{(l)} = \ ^{n_l\text{ outputs}}
+  \begin{cases}
+    \begin{bmatrix}
+      a^{(l)}_{1} \\
+      a^{(l)}_{2} \\
+      \vdots \\
+      a^{(l)}_{n_l}
+    \end{bmatrix}
+  \end{cases}
+$$
+
+$a^{(l)}$ is the activation matrix for the $l$th layer
+
+We have that:
+
+$$
+\begin{aligned}
+a^{(l)} &= g\left(z^{(l)}\right) \\ \\
+&= g\left(W^{(l)} * a^{(l - 1)} + b^{(l)}\right) \\ \\
+&= g\left(\ ^{n_l\text{ outputs}}
+\overbrace{
+  \begin{cases}
+    \begin{bmatrix}
+    w^{(l)}_{1, 1} & w^{(l)}_{1, 2} & \cdots & w^{(l)}_{1, n_{l-1}} \\
+    w^{(l)}_{2, 1} & w^{(l)}_{2, 2} & \cdots & w^{(l)}_{2, n_{l-1}} \\
+    \vdots & \vdots & \ddots & \vdots \\
+    w^{(l)}_{n_l, 1} & w^{(l)}_{n_l, 2} & \cdots & w^{(l)}_{n_l, n_{l-1}}
+    \end{bmatrix}
+  \end{cases} 
+}^{n_{l - 1} \text{ inputs}} * \ ^{n_{l - 1} \text{ inputs}}
+  \begin{cases}
+    \begin{bmatrix}
+      a^{(l-1)}_{1} \\
+      a^{(l-1)}_{2} \\
+      \vdots \\
+      a^{(l-1)}_{n_l}
+    \end{bmatrix}
+  \end{cases} + \ ^{n_l\text{ outputs}}
+  \begin{cases}
+    \begin{bmatrix}
+    b^{(l)}_{1} \\
+    b^{(l)}_{2} \\
+    \vdots \\
+    b^{(l)}_{n_l}
+    \end{bmatrix}
+  \end{cases}\right) \\ \\
+&= g\left(\ ^{n_l\text{ outputs}}
+  \begin{cases}
+    \begin{bmatrix}
+      z^{(l)}_{1} \\
+      z^{(l)}_{2} \\
+      \vdots \\
+      z^{(l)}_{n_l}
+    \end{bmatrix}
+  \end{cases}\right) \\ \\
+&= \ ^{n_l\text{ outputs}}
+  \begin{cases}
+    \begin{bmatrix}
+      a^{(l)}_{1} \\
+      a^{(l)}_{2} \\
+      \vdots \\
+      a^{(l)}_{n_l}
+    \end{bmatrix}
+  \end{cases}
+\end{aligned}
+$$
+
+# Forward Propagation
+
+## Setup
+
+For a single neuron, it's activation is going to be a weighted sum of all the activations of the previous layer, plus a constant, all fed into the activation function. Formally, this is:
+
+$$a^{(l)}_j = g\left(\sum_{i = 1}^{n_{l - 1}} w^{(l)}_{j, i} * a^{(l - 1)}_{i} + b^{(l)}_{j}\right)$$
+
+We can put this in matrix form. An entire layer of neurons can be represented by:
+
+$$a^{(l)} = g\left(z^{(l)}\right) = g\left(W^{(l)} * a^{(l - 1)} + b^{(l)}\right)$$
+
+as was shown above. We can repeatedly apply this formula to get from $X$ to out predicted $\hat Y = a^{(L)}$. We start with the initial layer (layer 0) being set equal to $x_i$.
+
+Note that we will be forward (& backward) propagating one observation of $X$ at a time by operating on each column separately. However, if desired forward (& backward) propagation can be done on all observations simultaneously. The notation change would involve stretching out $a^{(l)}$, $z^{(l)}$, and $b^{(l)}$ so that they are each $m$ wide:
+
+$$
+\begin{aligned}
+a^{(l)} &= g\left(z^{(l)}\right) \\ \\
+&= g\left(W^{(l)} * a^{(l - 1)} + b^{(l)}\right) \\ \\
+&= g(\ ^{n_l\text{ outputs}}
+\overbrace{
+  \begin{cases}
+    \begin{bmatrix}
+    w^{(l)}_{1, 1} & w^{(l)}_{1, 2} & \cdots & w^{(l)}_{1, n_{l-1}} \\
+    w^{(l)}_{2, 1} & w^{(l)}_{2, 2} & \cdots & w^{(l)}_{2, n_{l-1}} \\
+    \vdots & \vdots & \ddots & \vdots \\
+    w^{(l)}_{n_l, 1} & w^{(l)}_{n_l, 2} & \cdots & w^{(l)}_{n_l, n_{l-1}}
+    \end{bmatrix}
+  \end{cases} 
+}^{n_{l - 1} \text{ inputs}} * \ ^{n_{l - 1} \text{ inputs}}
+\overbrace{
+  \begin{cases}
+    \begin{bmatrix}
+    a^{(l - 1)}_{1, 1} & a^{(l - 1)}_{1, 2} & \cdots & a^{(l - 1)}_{1, m} \\
+    a^{(l - 1)}_{2, 1} & a^{(l - 1)}_{2, 2} & \cdots & a^{(l - 1)}_{2, m} \\
+    \vdots & \vdots & \ddots & \vdots \\
+    a^{(l - 1)}_{n_{l - 1}, 1} & a^{(l - 1)}_{n_{l - 1}, 2} & \cdots & a^{(l - 1)}_{n_{l - 1}, m} \\
+    \end{bmatrix}
+  \end{cases} 
+}^{m \text{ obs}} \\
+&+ \ ^{n_l \text{ outputs}}
+\overbrace{
+  \begin{cases}
+    \begin{bmatrix}
+    - & b^{(l)}_{1} & - \\
+    - & b^{(l)}_{2} & - \\
+    \vdots & \vdots & \vdots \\
+    - & b^{(l)}_{n_l} & -
+    \end{bmatrix}
+  \end{cases} 
+}^{m \text{ obs}}) \\ \\
+&= g\left(\ ^{n_l \text{ outputs}}
+\overbrace{
+  \begin{cases}
+    \begin{bmatrix}
+    z^{(l)}_{1, 1} & z^{(l)}_{1, 2} & \cdots & z^{(l)}_{1, m} \\
+    z^{(l)}_{2, 1} & z^{(l)}_{2, 2} & \cdots & z^{(l)}_{2, m} \\
+    \vdots & \vdots & \ddots & \vdots \\
+    z^{(l)}_{n_l, 1} & z^{(l)}_{n_l, 2} & \cdots & z^{(l)}_{n_l, m} \\
+    \end{bmatrix}
+  \end{cases} 
+}^{m \text{ obs}}\right) \\ \\
+&= \ ^{n_l \text{ outputs}}
+\overbrace{
+  \begin{cases}
+    \begin{bmatrix}
+    a^{(l)}_{1, 1} & a^{(l)}_{1, 2} & \cdots & a^{(l)}_{1, m} \\
+    a^{(l)}_{2, 1} & a^{(l)}_{2, 2} & \cdots & a^{(l)}_{2, m} \\
+    \vdots & \vdots & \ddots & \vdots \\
+    a^{(l)}_{n_l, 1} & a^{(l)}_{n_l, 2} & \cdots & a^{(l)}_{n_l, m} \\
+    \end{bmatrix}
+  \end{cases} 
+}^{m \text{ obs}}
+\end{aligned}
+$$
+
+Each column of $a^{(l)}$ and $z^{(l)}$ represent an observation and can hold unique values, while $b^{(l)}$ is merely repeated to be $m$ wide; each row is the same bias value for each neuron.
+
+We are sticking with one observation at a time for it's simplicity, and it makes the back-propagation linear algebra easier/cleaner.
+
+## Algorithm
+
+For a given observation $x_i$:
+
+1.  set $a^{(0)} = x_i$
+2.  For each $l$ from 1 up to $L$:
+    -   $z^{(l)} = W^{(l)} a^{(l - 1)} + b^{(l)}$
+    -   $a^{(l)} = g\left(z^{(l)}\right)$
+    -   $D^{(l)} = \diag \left[g'\left(z^{(l)}\right)\right]$
+        -   this term will be needed later
+
+if $Y$ happens to be categorical, we may choose to apply the softmax function ($\frac{e^{z_i}}{\sum e^{z_j}}$) to $a^{(L)}$. Otherwise, we are done! We have our estimated result $a^{(L)}$.
+
+# Backward Propagation
+
+Recall that we are trying to minimize a cost function via gradient descent by iterating over our parameter vector $\theta: \theta^{t + 1} \leftarrow \theta^t - \rho * \nabla\mathcal{C}(\theta)$. We will now implement this.
+
+To do so, there is one more useful variable we need to define: $\delta^{(l)}$
+
+## Delta
+
+We define $\delta^{(l)}_j := \frac{\partial \C}{\partial z^{(l)}_j}$ for a particular neuron, and its vector form $\delta^{(l)}$ represents the whole layer.
+
+$\delta^{(l)}$ allows us to back-propagate one layer at a time by defining the gradients of the earlier layers from those of the later layers. In particular:
+
+$$\delta^{(l)} = \diag \left[g'\left(z^{(l)}\right)\right] * \left(W^{(l + 1)}\right)^T * \delta^{(l + 1)}$$
+
+The derivation is in the linked paper, so I won't go over it in full here
+
+---
+
+In short, $z^{(l + 1)} = W^{(l + 1)} * g\left(z^{(l)}\right) + b^{(l + 1)}$; so, $\delta^{(l)}$ is related to $\delta^{(l + 1)}$ via the chain rule:
+
+$$\delta^{(l)} = \frac{\partial \C}{\partial z^{(l)}} = \underbrace{\frac{\partial \C}{\partial z^{(l + 1)}}}_{\delta^{(l + 1)}} * \underbrace{\frac{\partial z^{(l + 1)}}{\partial g}}_{\left(W^{(l + 1)}\right)^T} * \underbrace{\frac{\partial g}{\partial z^{(l)}}}_{g'\left(z^{(l)}\right)}$$
+
+[eventually, add in a write-up on why the transpose of $W$ is taken. In short, it takes the dot product each neuron's output across the next layer's neurons ($\left(W^{(l + 1)}\right)^T$, each row is the input neuron being distributed across the next layer) with the next layer's $\delta^{(l + 1)}$]
+
+---
+
+Note that we scale $\delta^{(l)}$ by $g'\left(z^{(l)}\right)$, which we do by multiplying on the left by:
+
+$$\diag \left[g'\left(z^{(l)}\right)\right] = \begin{bmatrix} g'\left(z^{(l)}_1\right) &  &  &  \\  & g'\left(z^{(l)}_2\right) &  &  \\  &  & \ddots &  \\  &  &  & g'\left(z^{(l)}_{n_l}\right) \end{bmatrix}$$
+
+This has the same effect as element-wise multiplication.
+
+For shorthand, we define $D^{(l)} = \diag \left[g'\left(z^{(l)}\right)\right]$
+
+## Gradients
+
+Given $\delta^{(l)}$, it becomes simple to write down our gradients:
+
+$$
+\begin{aligned}
+  \delta^{(L)} &= D^{(L)} * \frac{\partial \C}{\partial a^{(L)}} & \text{(a)} \\ \\
+  \delta^{(l)} &= D^{(l)} * \left(W^{(l + 1)}\right)^T * \delta^{(l + 1)} & \text{(b)} \\ \\
+  \frac{\partial \C}{\partial b^{(b)}} &= \delta^{(l)} & \text{(c)} \\ \\
+  \frac{\partial \C}{\partial W^{(l)}} &= \delta^{(l)} * \left(a^{(l - 1)}\right)^T & \text{(d)}
+\end{aligned}
+$$
+
+The proofs of these are in the linked paper. (could add in a bit with an intuitive explanation. eventually I want to get better vis of the chain rule tho beforehand, because I bet we could get something neat with neuron & derivative visualizations)
+
+(we can also do this with expanded matrix view as above)
+
+For the squared-error loss function $\mathcal{C}(\theta) = \frac{1}{2} (y - a^{(L)})^2$, we would have $\frac{\partial \C}{\partial a^{(L)}} = (a^{(L)} - y)$ [find out what this is for log-loss :) softmax too?]
+
+### a
+
+### b
+
+### c
+
+### d
+
+## Algorithm
+
+For a given observation $x_i$:
+
+1.  set $\delta^{(L)} = D^{(l)} * \frac{\partial \C}{\partial a^{(L)}}$
+2.  For each $l$ from $(L - 1)$ down to 1:
+    -   $\delta^{(l)} = D^{(l)} * \left(W^{(l + 1)}\right)^T * \delta^{(l + 1)}$
+3.  For each $l$ from $L$ down to 1:
+    * $W^{(l)} \leftarrow W^{(l)} - \rho * \delta^{(l)} * \left(a^{(l - 1)}\right)^T$
+    * $b^{(l)} \leftarrow W^{(l)} - \rho * \delta^{(l)}$
+        
+# Example
+
+A simple example of using a neural network on simulated data.
+
+Note, because R is 1-indexed, we have our input layer as layer 1 now (i.e. $W^{(l)}$ starts at $W^{(2)}$)
+
+## Generate Data
+
+For now, having 3 inputs and combining them to create y, with a random error term. Would like to tweak the setup eventually.
+
+```{r}
+## create data:
+m <- 1000
+n_1 <- 3
+
+# initialize Xs
+X <- data.frame(X1 = runif(n = m, min = -10, max = 10),
+                X2 = rnorm(n = m, mean = 0, sd = 10),
+                X3 = rexp(n = m, rate = 1)) %>%
+  as.matrix(nrow = m,
+            ncol = n_1)
+
+# get response
+Y <- X[, 1] + 10 * sin(X[, 2])^2 + 10 * X[, 3] + rnorm(n = 1000)
+
+# fix dims
+X <- t(X)
+Y <- t(Y)
+```
+
+## Parameter Setup
+
+```{r}
+## NN properties
+hidden_layer_sizes <- c(3)
+output_layer_size <- 1
+```
+
+
+```{r}
+## initialize parameter matrices
+W <- list()
+b <- list()
+
+n <- c(n_1, hidden_layer_sizes, output_layer_size)
+
+## eventually use lapply()
+for (l in 2:length(n)) {
+
+  W[[l]] <- matrix(data = runif(n = n[l - 1] * n[l], min = 0, max = 1),
+                   nrow = n[l],
+                   ncol = n[l - 1])
+
+  b[[l]] <- matrix(data = runif(n = n[l], min = 0, max = 1),
+                   nrow = n[l],
+                   ncol = 1)
+
+}
+```
+
+```{r}
+## Specify Link Functions & Derivatives:
+
+# identity
+# g <- function(x) {x}
+# g_prime <- function(x) {1}
+
+# sigmoid
+# g <- function(x) {1 / (1 + exp(-x))}
+# g_prime <- function(x) {exp(-x) / (1 + exp(-x))^2}
+
+# ReLU
+g <- function(x) {x * as.numeric(x > 0)}
+g_prime <- function(x) {as.numeric(x > 0)}
+```
+
+## Network Training
+
+```{r}
+## helper functions
+
+# creates a list of n empty lists
+create_lists <- function(n) {
+  out <- list()
+  
+  for (i in 1:n) {
+    out[[i]] <- list()
+  }
+  
+  return(out)
+}
+
+# applies gradient, used in mapply() function
+apply_gradient <- function(A,
+                           del_A,
+                           rho = 1) {
+  A - rho * del_A
+}
+
+# friendlier diag() function
+diag_D <- function(x) {
+  if (length(x) == 1) {
+        out <- x
+      } else {
+        out <- diag(as.numeric(x))
+      }
+  
+  return(out)
+}
+
+## gets an output
+NN_output <- function(obs = 1:m,
+                      in_X = X,
+                      in_W = W,
+                      in_b = b) {
+  
+  L <- length(in_W)
+  in_m <- length(obs)
+  
+  a <- list()
+  
+  a[[1]] <- in_X[, obs]
+  
+  for (l in 2:L) {
+    a[[l]] <- g(in_W[[l]] %*% a[[l - 1]] + matrix(data = rep(x = in_b[[l]],
+                                                             times = in_m),
+                                                  ncol = in_m))
+  }
+  
+  return(a[[L]])
+  
+}
+```
+
+
+```{r}
+GD_iter <- function(obs = 1:m,
+                    rho = 1,
+                    in_X = X,
+                    in_Y = Y,
+                    in_W = W,
+                    in_b = b,
+                    verbose = FALSE,
+                    very_verbose = FALSE) {
+  
+  L <- length(in_W)
+  
+  z <- create_lists(L)
+  a <- create_lists(L)
+  D <- create_lists(L)
+  delta <- create_lists(L)
+  del_W <- create_lists(L)
+  del_b <- create_lists(L)
+  
+  ## gradient descent
+  for (i in 1:length(obs)) {
+    
+    ## forward
+    a[[1]][[i]] <- in_X[, obs[i]]
+    
+    for (l in 2:L) {
+      z[[l]][[i]] <- in_W[[l]] %*% a[[l - 1]][[i]] + in_b[[l]]
+      a[[l]][[i]] <- g(z[[l]][[i]])
+      D[[l]][[i]] <- diag_D(g_prime(z[[l]][[i]]))
+      
+      if (very_verbose == TRUE) {print(paste0("Forward: obs ", i, " - layer ", l))}
+    }
+    
+    ## backward
+    delta[[L]][[i]] <- D[[L]][[i]] %*% (a[[L]][[i]] - in_Y[, obs[i]])
+    
+    for (l in (L - 1):2) {
+      delta[[l]][[i]] <- D[[l]][[i]] %*% t(W[[l + 1]]) %*% delta[[l + 1]][[i]]
+      if (very_verbose == TRUE) {print(paste0("Backward: obs ", i, " - layer ", l))}
+    }
+    
+    for (l in 2:L) {
+      del_W[[l]][[i]] <- delta[[l]][[i]] %*% t(a[[l - 1]][[i]])
+      del_b[[l]][[i]] <- delta[[l]][[i]]
+      if (very_verbose == TRUE) {print(paste0("del: obs ", i, " - layer ", l))}
+    }
+    
+    if ((verbose == TRUE) & (i %% 100 == 0)) {print(paste("obs", i, "/", m))}
+    
+  }
+  
+  ## update parameters
+  
+  # get averages
+  ## del_W is a list where each element represents a layer
+  ## in each layer, there is a list representing that layer's result for that observation
+  ## here we collapse the results by taking the sum of our gradients
+  del_W_all <- lapply(X = del_W,
+                      FUN = Reduce,
+                      f = "+") %>%
+    lapply(X = .,
+           FUN = function(x) x / length(obs))
+  
+  del_b_all <- lapply(X = del_b,
+                      FUN = Reduce,
+                      f = "+") %>%
+    lapply(X = .,
+           FUN = function(x) x / length(obs))
+  
+  # apply gradient
+  W_out <- mapply(FUN = apply_gradient,
+                  in_W,
+                  del_W_all,
+                  MoreArgs = list(rho = rho))
+  
+  b_out <- mapply(FUN = apply_gradient,
+                  in_b,
+                  del_b_all,
+                  MoreArgs = list(rho = rho))
+  
+  return(list(W = W_out,
+              b = b_out))
+}
+```
+
+
+```{r apply_GD}
+threshold <- 1
+max_iter <- 1000
+
+done_decreasing <- FALSE
+
+iteration_input <- list()
+iteration_outputs <- list()
+output_objectives <- numeric()
+
+iteration_input$W <- W
+iteration_input$b <- b
+
+iter <- 1
+
+initial_objective <- sum((NN_output(in_W = iteration_input$W, in_b = iteration_input$b) - Y)^2)
+
+print(0)
+print(initial_objective)
+
+while ((!done_decreasing) & (iter < max_iter)) {
+  ## get input loss
+  in_objective <- sum((NN_output(in_W = iteration_input$W, in_b = iteration_input$b) - Y)^2)
+  
+  ## perform iteration
+  iteration <- GD_iter(obs = 1:m,
+                       rho = .01,
+                       in_W = iteration_input$W,
+                       in_b = iteration_input$b,
+                       verbose = FALSE)
+  
+  ## get outputs
+  out_objective <- sum((NN_output(in_W = iteration$W, in_b = iteration$b) - Y)^2)
+  
+  iteration_input <- iteration
+  iteration_outputs[[iter]] <- iteration
+  output_objectives[[iter]] <- out_objective
+  
+  # print(iter)
+  # print(out_objective)
+  
+  iter <- iter + 1
+  
+  ## evaluate
+  if (abs(in_objective - out_objective) < threshold) {
+    # iter <- iter - 1
+    done_decreasing <- TRUE
+  }
+}
+```
+
+
+```{r}
+iter <- iter - 1
+final_objective <- output_objectives[[iter]]
+
+## number of iterations
+iter
+
+## loss improvement ratio
+initial_objective
+
+final_objective
+
+final_objective / initial_objective
+
+## input W
+W
+
+## output W
+iteration_outputs[[iter]]$W
+
+## input b
+b
+
+## output B
+iteration_outputs[[iter]]$b
+
+first_plot_ind <- 1
+
+plot(x = first_plot_ind:iter,
+     y = output_objectives[first_plot_ind:iter],
+     pch = 19)
+```
+
+need some sort of divergence check
