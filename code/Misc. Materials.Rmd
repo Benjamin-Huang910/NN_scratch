@@ -69,3 +69,52 @@ plot(z_values, softmax_values, type = "l", col = "orange",
      grid = TRUE)
 legend("topright", legend = "Softmax Function", col = "orange", lty = 1)
 ```
+
+```{r gradient descent}
+# Define the gradient descent function
+gradient_descent <- function(X, y, theta, alpha, num_iters) {
+  m <- length(y)  # Number of training examples
+  J_history <- numeric(num_iters)  # Initialize vector to store cost function values
+  
+  for (iter in 1:num_iters) {
+    # Compute hypothesis
+    h <- X %*% theta
+    
+    # Compute error
+    error <- h - y
+    
+    # Compute gradient
+    gradient <- t(X) %*% error / m
+    
+    # Update parameters (theta)
+    theta <- theta - alpha * gradient
+    
+    # Compute cost function
+    J_history[iter] <- sum(error^2) / (2 * m)
+  }
+  
+  return(list(theta = theta, J_history = J_history))
+}
+
+# Example usage
+# Generate some random data
+set.seed(123)
+X <- cbind(1, runif(100))  # Features (including bias term)
+y <- 2 * X[, 2] + rnorm(100)  # True relationship plus some noise
+
+# Initialize parameters
+theta <- matrix(0, nrow = 2, ncol = 1)  # Initialize theta as zeros
+
+# Set hyperparameters
+alpha <- 0.01  # Learning rate
+num_iters <- 250  # Number of iterations
+
+# Run gradient descent
+result <- gradient_descent(X, y, theta, alpha, num_iters)
+
+# Print the learned parameters
+cat("Learned parameters (theta):", result$theta, "\n")
+
+# Plot the cost function over iterations
+plot(result$J_history, type = "p", xlab = "Iteration", ylab = "Loss", main = "Loss Function over Iterations", pch = 16, col = "black")
+```
