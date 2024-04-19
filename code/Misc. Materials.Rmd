@@ -1,0 +1,120 @@
+---
+title: "Misc. Materials"
+author: "Benjamin Huang"
+date: "2024-04-12"
+output: html_document
+---
+
+```{r sigmoid}
+# Define the sigmoid function
+sigmoid <- function(z) {
+  return(1 / (1 + exp(-z)))
+}
+
+# Generate values for z
+z_values <- seq(-10, 10, length.out = 100)
+
+# Calculate corresponding values of sigmoid function
+g_values <- sigmoid(z_values)
+
+# Plot the sigmoid function
+plot(z_values, g_values, type = "l", col = "blue", 
+     xlab = "z", ylab = "g(z)", 
+     main = "Graph of Sigmoid Function", 
+     xlim = c(-10, 10), ylim = c(0, 1), 
+     grid = TRUE)
+legend("bottomright", legend = "Sigmoid Function", col = "blue", lty = 1)
+```
+
+```{r relu}
+# Define the ReLU function
+relu <- function(z) {
+  ifelse(z < 0, 0, z)
+}
+
+# Generate values for z
+z_values <- seq(-10, 10, by = 0.1)
+
+# Compute corresponding values for g(z)
+g_values <- relu(z_values)
+
+# Plot the ReLU function
+plot(z_values, g_values, type = "l", col = "red",
+     xlab = "z", ylab = "g(z)",
+     main = "Graph of ReLU Function",
+     xlim = c(-10, 10), ylim = c(0, 1),
+     grid = TRUE)
+legend("bottomright", legend = "ReLu Function", col = "red", lty = 1)
+```
+
+```{r softmax}
+# Define the softmax function
+softmax <- function(z) {
+  exp_z <- exp(z)
+  softmax <- exp_z / sum(exp_z)
+  return(softmax)
+}
+
+# Generate some sample z values
+z_values <- seq(-10, 10, by = 1.5)
+
+# Compute softmax function values
+softmax_values <- softmax(z_values)
+
+# Plot the softmax function
+plot(z_values, softmax_values, type = "l", col = "orange",
+     xlab = "z", ylab = "f_s(X)",
+     main = "Graph of Softmax Function",
+     xlim = c(-10, 10), ylim = c(0, 1),
+     grid = TRUE)
+legend("topright", legend = "Softmax Function", col = "orange", lty = 1)
+```
+
+```{r gradient descent}
+# Define the gradient descent function
+gradient_descent <- function(X, y, theta, alpha, num_iters) {
+  m <- length(y)  # Number of training examples
+  J_history <- numeric(num_iters)  # Initialize vector to store cost function values
+  
+  for (iter in 1:num_iters) {
+    # Compute hypothesis
+    h <- X %*% theta
+    
+    # Compute error
+    error <- h - y
+    
+    # Compute gradient
+    gradient <- t(X) %*% error / m
+    
+    # Update parameters (theta)
+    theta <- theta - alpha * gradient
+    
+    # Compute cost function
+    J_history[iter] <- sum(error^2) / (2 * m)
+  }
+  
+  return(list(theta = theta, J_history = J_history))
+}
+
+# Example usage
+# Generate some random data
+set.seed(123)
+X <- cbind(1, runif(100))  # Features (including bias term)
+y <- 2 * X[, 2] + rnorm(100)  # True relationship plus some noise
+
+# Initialize parameters
+theta <- matrix(0, nrow = 2, ncol = 1)  # Initialize theta as zeros
+
+# Set hyperparameters
+alpha <- 0.01  # Learning rate
+num_iters <- 250  # Number of iterations
+
+# Run gradient descent
+result <- gradient_descent(X, y, theta, alpha, num_iters)
+
+# Print the learned parameters
+cat("Learned parameters (theta):", result$theta, "\n")
+
+# Plot the cost function over iterations
+plot(result$J_history, type = "p", xlab = "Iteration", ylab = "Loss", main = "Loss Function over Iterations", pch = 16, col = "black")
+```
